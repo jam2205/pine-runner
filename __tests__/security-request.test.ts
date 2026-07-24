@@ -32,7 +32,14 @@ function syntheticBars(count: number): OhlcvBar[] {
   const start = Date.UTC(2026, 0, 5); // Monday 00:00 UTC
   for (let i = 0; i < count; i++) {
     const base = 100 + Math.sin(i / 25) * 5;
-    bars.push({ t: start + i * MIN, o: base, h: base + 1, l: base - 1, c: base + 0.5, v: 1000 + i });
+    bars.push({
+      t: start + i * MIN,
+      o: base,
+      h: base + 1,
+      l: base - 1,
+      c: base + 0.5,
+      v: 1000 + i,
+    });
   }
   return bars;
 }

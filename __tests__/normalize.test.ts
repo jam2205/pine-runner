@@ -366,11 +366,26 @@ describe('normalizePineHlines', () => {
 describe('normalizePineFills', () => {
   it('builds a band between two referenced plot series', () => {
     const plots = {
-      f: { options: { display: 'none' }, data: [{ time: 1_000, value: 10 }, { time: 2_000, value: 12 }] },
-      s: { options: { display: 'none' }, data: [{ time: 1_000, value: 8 }, { time: 2_000, value: 9 }] },
+      f: {
+        options: { display: 'none' },
+        data: [
+          { time: 1_000, value: 10 },
+          { time: 2_000, value: 12 },
+        ],
+      },
+      s: {
+        options: { display: 'none' },
+        data: [
+          { time: 1_000, value: 8 },
+          { time: 2_000, value: 9 },
+        ],
+      },
       fill: {
         options: { plot1: 'f', plot2: 's', color: '#2196F326', style: 'fill' },
-        data: [{ time: 1_000, value: null }, { time: 2_000, value: null }],
+        data: [
+          { time: 1_000, value: null },
+          { time: 2_000, value: null },
+        ],
       },
     };
     const fills = normalizePineFills(plots, candles);
@@ -424,17 +439,42 @@ describe('normalizePineShapeDrawings arrows and chars', () => {
         Arrow: {
           options: { colorup: '#4CAF50', colordown: '#F23645', style: 'shape' },
           data: [
-            { title: 'Arrow', time: 1_000, value: 1, options: { color: '#4CAF50', shape: 'shape_arrow_up', location: 'BelowBar' } },
-            { title: 'Arrow', time: 2_000, value: -1, options: { color: '#F23645', shape: 'shape_arrow_down', location: 'AboveBar' } },
-            { title: 'Arrow', time: 3_000, value: 0, options: { color: '#4CAF50', shape: 'shape_arrow_up', location: 'BelowBar' } },
+            {
+              title: 'Arrow',
+              time: 1_000,
+              value: 1,
+              options: { color: '#4CAF50', shape: 'shape_arrow_up', location: 'BelowBar' },
+            },
+            {
+              title: 'Arrow',
+              time: 2_000,
+              value: -1,
+              options: { color: '#F23645', shape: 'shape_arrow_down', location: 'AboveBar' },
+            },
+            {
+              title: 'Arrow',
+              time: 3_000,
+              value: 0,
+              options: { color: '#4CAF50', shape: 'shape_arrow_up', location: 'BelowBar' },
+            },
           ],
         },
       },
       candles,
     );
     expect(drawings).toHaveLength(2);
-    expect(drawings[0]).toMatchObject({ kind: 'shape', shape: 'shape_arrow_up', location: 'BelowBar', y: 9 });
-    expect(drawings[1]).toMatchObject({ kind: 'shape', shape: 'shape_arrow_down', location: 'AboveBar', y: 13 });
+    expect(drawings[0]).toMatchObject({
+      kind: 'shape',
+      shape: 'shape_arrow_up',
+      location: 'BelowBar',
+      y: 9,
+    });
+    expect(drawings[1]).toMatchObject({
+      kind: 'shape',
+      shape: 'shape_arrow_down',
+      location: 'AboveBar',
+      y: 13,
+    });
   });
 
   it('renders plotchar glyphs from the char option', () => {
@@ -444,14 +484,24 @@ describe('normalizePineShapeDrawings arrows and chars', () => {
           options: { char: '✚', location: 'BelowBar', color: '#FF9800', style: 'char' },
           data: [
             { title: 'Cross', time: 1_000, value: false },
-            { title: 'Cross', time: 2_000, value: true, options: { char: '✚', color: '#FF9800', location: 'BelowBar' } },
+            {
+              title: 'Cross',
+              time: 2_000,
+              value: true,
+              options: { char: '✚', color: '#FF9800', location: 'BelowBar' },
+            },
           ],
         },
       },
       candles,
     );
     expect(drawings).toHaveLength(1);
-    expect(drawings[0]).toMatchObject({ kind: 'shape', text: '✚', color: '#FF9800', location: 'BelowBar' });
+    expect(drawings[0]).toMatchObject({
+      kind: 'shape',
+      text: '✚',
+      color: '#FF9800',
+      location: 'BelowBar',
+    });
   });
 });
 

@@ -3,15 +3,15 @@
 // Copyright (C) 2026 QuantPad. Licensed under the GNU AGPL-3.0; see ../LICENSE.
 // Corresponding source: https://github.com/QuantPad/pine-runner
 import { loadPineEngine } from './engine';
-import {
-  normalizePineVisuals,
-  rebaseDrawingsToTime,
-  trimVisualsToWindow,
-} from './normalize';
-import { createDatabentoPineProvider } from './provider';
+import { normalizePineVisuals, rebaseDrawingsToTime, trimVisualsToWindow } from './normalize';
 import { type RunRequest, type RunResult, type ScanRequest, type ScanResult } from './protocol';
-import { resolvePineSettings, applyPineOverrides } from './settings';
-import { patchPineRuntimeClassCompat, patchPineRuntimeCompat, pineMarginCompat } from './runtime-compat';
+import { createDatabentoPineProvider } from './provider';
+import {
+  patchPineRuntimeClassCompat,
+  patchPineRuntimeCompat,
+  pineMarginCompat,
+} from './runtime-compat';
+import { applyPineOverrides, resolvePineSettings } from './settings';
 import { type OhlcvBar } from './types';
 
 /** Fields the parent's backtest normalizer reads off a raw engine trade. */

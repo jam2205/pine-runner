@@ -3,7 +3,7 @@
 Process-isolated Pine Script execution runner. **Licensed under GNU AGPL-3.0-only**
 (see [LICENSE](./LICENSE)).
 
-> **⚠ Publish/sync reminder (AGPL §13).** This folder is the *published*
+> **⚠ Publish/sync reminder (AGPL §13).** This folder is the _published_
 > Corresponding Source for an engine QuantPad runs as a network service, mirrored
 > at <https://github.com/QuantPad/pine-runner> and linked in-product. **Any time
 > you edit this folder and deploy it, re-publish the mirror** — otherwise the

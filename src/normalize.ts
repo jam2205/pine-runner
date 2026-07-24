@@ -6,6 +6,7 @@
 // output into QuantPad's chart artifact shape.
 import {
   type OhlcvBar,
+  type PineCandle,
   type PineChartBarColor,
   type PineChartDrawing,
   type PineChartFillBand,
@@ -14,7 +15,6 @@ import {
   type PineChartOverlay,
   type PineChartTable,
   type PineOverlayStyle,
-  type PineCandle,
 } from './types';
 
 export function toPineCandles(bars: OhlcvBar[], barMs = 60_000): PineCandle[] {
@@ -103,14 +103,7 @@ function plotDisplay(plot: unknown): string {
 
 // Plot styles that are NOT rendered as line/area overlays — each has its own
 // normalizer (shapes, background bands, bar colors, horizontal lines, fills).
-const NON_OVERLAY_STYLES = new Set([
-  'shape',
-  'char',
-  'background',
-  'barcolor',
-  'hline',
-  'fill',
-]);
+const NON_OVERLAY_STYLES = new Set(['shape', 'char', 'background', 'barcolor', 'hline', 'fill']);
 
 function isShapePlot(plot: unknown): boolean {
   const style = plotStyle(plot);
@@ -307,10 +300,16 @@ export function normalizePineHlines(plots: unknown): PineChartHline[] {
     }
     if (price == null) return;
     const obj = plot && typeof plot === 'object' ? (plot as Record<string, unknown>) : {};
-    const options = obj.options && typeof obj.options === 'object' ? (obj.options as Record<string, unknown>) : {};
+    const options =
+      obj.options && typeof obj.options === 'object'
+        ? (obj.options as Record<string, unknown>)
+        : {};
     const rawStyle = String(options.linestyle ?? '').toLowerCase();
-    const lineStyle =
-      rawStyle.includes('dash') ? 'dashed' : rawStyle.includes('dot') ? 'dotted' : 'solid';
+    const lineStyle = rawStyle.includes('dash')
+      ? 'dashed'
+      : rawStyle.includes('dot')
+        ? 'dotted'
+        : 'solid';
     hlines.push({
       id: stableOverlayId(plotName(key, plot), index),
       title: plotName(key, plot),
@@ -328,7 +327,10 @@ export function normalizePineFills(plots: unknown, candles: OhlcvBar[]): PineCha
   Object.entries(plots as Record<string, unknown>).forEach(([key, plot], index) => {
     if (key.startsWith('__') || plotStyle(plot) !== 'fill') return;
     const obj = plot && typeof plot === 'object' ? (plot as Record<string, unknown>) : {};
-    const options = obj.options && typeof obj.options === 'object' ? (obj.options as Record<string, unknown>) : {};
+    const options =
+      obj.options && typeof obj.options === 'object'
+        ? (obj.options as Record<string, unknown>)
+        : {};
     const plot1 = typeof options.plot1 === 'string' ? options.plot1 : null;
     const plot2 = typeof options.plot2 === 'string' ? options.plot2 : null;
     if (!plot1 || !plot2) return;
@@ -351,7 +353,10 @@ export function normalizePineFills(plots: unknown, candles: OhlcvBar[]): PineCha
   return fills;
 }
 
-function normalizeBarColorSeries(plots: unknown, style: 'background' | 'barcolor'): PineChartBarColor[] {
+function normalizeBarColorSeries(
+  plots: unknown,
+  style: 'background' | 'barcolor',
+): PineChartBarColor[] {
   if (!plots || typeof plots !== 'object') return [];
   const out: PineChartBarColor[] = [];
   Object.entries(plots as Record<string, unknown>).forEach(([key, plot]) => {
@@ -377,7 +382,10 @@ export function normalizePineBarColors(plots: unknown): PineChartBarColor[] {
   return normalizeBarColorSeries(plots, 'barcolor');
 }
 
-export function normalizePineShapeDrawings(plots: unknown, candles: OhlcvBar[]): PineChartDrawing[] {
+export function normalizePineShapeDrawings(
+  plots: unknown,
+  candles: OhlcvBar[],
+): PineChartDrawing[] {
   if (!plots || typeof plots !== 'object') return [];
   const drawings: PineChartDrawing[] = [];
 
@@ -430,10 +438,16 @@ export function normalizePineShapeDrawings(plots: unknown, candles: OhlcvBar[]):
         t,
         y,
         location,
-        shape: typeof options.shape === 'string' ? options.shape : (plotOptions.shape as string | undefined),
+        shape:
+          typeof options.shape === 'string'
+            ? options.shape
+            : (plotOptions.shape as string | undefined),
         text,
         color: cleanColor(options.color ?? plotOptions.color),
-        size: typeof options.size === 'string' ? options.size : (plotOptions.size as string | undefined),
+        size:
+          typeof options.size === 'string'
+            ? options.size
+            : (plotOptions.size as string | undefined),
       });
     });
   });
@@ -644,7 +658,9 @@ export function rebaseDrawingsToTime(
               xloc: 'time',
             };
       case 'label':
-        return isTimeXloc(drawing.xloc) ? drawing : { ...drawing, x: toTime(drawing.x), xloc: 'time' };
+        return isTimeXloc(drawing.xloc)
+          ? drawing
+          : { ...drawing, x: toTime(drawing.x), xloc: 'time' };
       case 'polyline':
         return isTimeXloc(drawing.xloc)
           ? drawing

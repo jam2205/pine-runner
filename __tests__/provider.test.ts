@@ -72,7 +72,13 @@ describe('createDatabentoPineProvider.getMarketData', () => {
   });
 
   it('filters by requested date range', async () => {
-    const series = await provider.getMarketData('ES.FUT', '1', undefined, start + 10 * MIN, start + 19 * MIN);
+    const series = await provider.getMarketData(
+      'ES.FUT',
+      '1',
+      undefined,
+      start + 10 * MIN,
+      start + 19 * MIN,
+    );
     expect(series.length).toBe(10);
     expect(series[0].openTime).toBe(start + 10 * MIN);
   });

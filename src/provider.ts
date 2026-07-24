@@ -84,9 +84,10 @@ export function createDatabentoPineProvider(params: {
           // which is what `ta.change(request.security(..., time))` boundary
           // detection relies on. +1ms on closeTime defeats the >= comparison
           // for exactly that last constituent bar and nothing else.
-          resampled = toPineCandles(resampleOhlcvBars(params.bars, tfMs), tfMs).map(
-            (candle) => ({ ...candle, closeTime: candle.closeTime + 1 }),
-          );
+          resampled = toPineCandles(resampleOhlcvBars(params.bars, tfMs), tfMs).map((candle) => ({
+            ...candle,
+            closeTime: candle.closeTime + 1,
+          }));
           resampleCache.set(tfMs, resampled);
         }
         series = resampled;

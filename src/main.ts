@@ -25,11 +25,7 @@
 import { readFileSync } from 'node:fs';
 
 import { encodeSpecials } from './codec';
-import {
-  type CompactBarRow,
-  type PineRunnerRequest,
-  type PineRunnerResponse,
-} from './protocol';
+import { type CompactBarRow, type PineRunnerRequest, type PineRunnerResponse } from './protocol';
 import { runPine, scanPine } from './run';
 import { type OhlcvBar } from './types';
 
@@ -50,14 +46,20 @@ async function handle(req: PineRunnerRequest): Promise<PineRunnerResponse> {
     const bars = readBars(req.barsFile);
     return { ok: true, result: await runPine(req, bars) };
   }
-  return { ok: false, error: { message: `Unknown op: ${(req as { op?: string }).op}`, status: 400 } };
+  return {
+    ok: false,
+    error: { message: `Unknown op: ${(req as { op?: string }).op}`, status: 400 },
+  };
 }
 
 async function main() {
   const requestPath = process.argv[2];
   if (!requestPath) {
     writeAndExit(
-      encodeSpecials({ ok: false, error: { message: 'Missing request file argument', status: 400 } }),
+      encodeSpecials({
+        ok: false,
+        error: { message: 'Missing request file argument', status: 400 },
+      }),
     );
     return;
   }
