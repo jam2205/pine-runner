@@ -3,6 +3,19 @@
 Process-isolated Pine Script execution runner. **Licensed under GNU AGPL-3.0-only**
 (see [LICENSE](./LICENSE)).
 
+> **⚠ Publish/sync reminder (AGPL §13).** This folder is the *published*
+> Corresponding Source for an engine QuantPad runs as a network service, mirrored
+> at <https://github.com/QuantPad/pine-runner> and linked in-product. **Any time
+> you edit this folder and deploy it, re-publish the mirror** — otherwise the
+> running service falls out of AGPL compliance:
+>
+> ```bash
+> npm run pine:publish   # from the monorepo root; no-op if already in sync
+> ```
+>
+> This lives in the monorepo under `pine-runner/`; the sync script is
+> `scripts/publish-pine-runner.sh`.
+
 This package wraps a third-party **AGPL-3.0** Pine transpiler/runtime engine and
 exposes it as a **spawned child process** that communicates with the host
 application over an arm's-length JSON protocol only (request file + bars file in,

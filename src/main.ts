@@ -2,6 +2,15 @@
 // Part of @quantpad/pine-runner — the process-isolated Pine execution engine.
 // Copyright (C) 2026 QuantPad. Licensed under the GNU AGPL-3.0; see ../LICENSE.
 // Corresponding source: https://github.com/QuantPad/pine-runner
+//
+// ┌───────────────────────────────────────────────────────────────────────┐
+// │ AI/DEV REMINDER — AGPL §13 SYNC                                         │
+// │ This package is the PUBLISHED source for an engine we run as a network  │
+// │ service. If you edit ANYTHING under pine-runner/ and it will ship, you  │
+// │ MUST re-publish the public mirror or we fall out of AGPL compliance:    │
+// │     npm run pine:publish     (no-op if the mirror is already current)   │
+// │ See pine-runner/README.md and scripts/publish-pine-runner.sh.           │
+// └───────────────────────────────────────────────────────────────────────┘
 /**
  * Pine runner CLI entry point (child process).
  *
