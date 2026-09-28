@@ -1,0 +1,24 @@
+{
+  "name": "@quantpad/pine-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Process-isolated Pine Script execution runner (AGPL-3.0). Spawned as a child process by the host app and communicated with over arm's-length JSON.",
+  "license": "AGPL-3.0-only",
+  "type": "commonjs",
+  "main": "dist/main.mjs",
+  "bin": {
+    "pine-runner": "dist/main.mjs"
+  },
+  "files": [
+    "src",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node18 --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\" --outfile=dist/main.mjs"
+  },
+  "dependencies": {
+    "pinets": "0.9.27"
+  }
+}
