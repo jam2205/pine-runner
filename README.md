@@ -124,7 +124,8 @@ Also in this fork (2026-10-13):
   lists what was asked for, so the parent can supply it and run again.
 - **Price-pane drawings.** Boxes, lines and labels drawn with `force_overlay = true` are returned
   (`forceOverlay: true`); they were dropped.
-- **Signed formats.** `str.tostring(x, "+0.00;-0.00")` prints as TradingView does.
+- **Number formats.** `str.tostring(x, "+0.00;-0.00")` prints as TradingView does, and a price is
+  rounded the way the chart rounds it (round(value / tick) * tick), so 209.5325 reads 209.533.
 
 Known gaps in the pinned engine (pinets 0.9.27) that a script has to avoid: a tuple returned from
 `request.security` through a user function; a local or global variable sharing a name with a

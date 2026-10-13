@@ -107,4 +107,16 @@ plot(close)
     const label = (r.visuals.drawings as { kind: string; text?: string }[]).find((x) => x.kind === 'label');
     expect(label?.text).toBe('+1.235|-0.5|+0.0|-2.50|3.14');
   });
+
+  it('rounds the number as stored, as TradingView does', async () => {
+    // Read off the chart (IG:GBPJPY, 2026-10-13): 209.5325 shows 209.533, 209.4905 shows 209.491, 209.9765 shows 209.976.
+    const r = await run(`//@version=6
+indicator("half", overlay = true)
+if barstate.islast
+    label.new(bar_index, close, str.tostring(209.5325, format.mintick) + "|" + str.tostring(209.4905, "0.000") + "|" + str.tostring(209.9765, format.mintick) + "|" + str.tostring(2.5, "0") + "|" + str.tostring(4166.876, "#.###") + "|" + str.tostring(1.2, "0.000"))
+plot(close)
+`);
+    const label = (r.visuals.drawings as { kind: string; text?: string }[]).find((x) => x.kind === 'label');
+    expect(label?.text).toBe('209.533|209.491|209.976|3|4166.876|1.200');
+  });
 });

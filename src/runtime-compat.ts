@@ -160,7 +160,7 @@ export function patchPineRuntimeClassCompat(engineClass: unknown): void {
     const context = (original as (...a: unknown[]) => unknown).apply(this, args);
     installParamsTimeUnwrap(context);
     installSessionCalendar(context);
-    installSignedFormats(context);
+    installNumberFormats(context);
     return context;
   };
 }
@@ -254,15 +254,26 @@ function installSessionCalendar(context: unknown): void {
 }
 
 /**
- * Modified by jam2205 (2026). `str.tostring(x, "+0.00;-0.00")`: a format with
- * a positive and a negative pattern, or a leading sign, which TradingView
- * prints as "+1.23" / "-0.50". The stock engine does not know the form and
- * prints the number at full length ("1.2345600000"). The number part is still
- * formatted by the stock method; only the pattern choice and the text around
- * it are handled here. Any other format goes straight to the stock method.
+ * Modified by jam2205 (2026). Two things `str.tostring` gets wrong in the stock
+ * engine, both measured against TradingView on the same numbers:
+ *
+ *   signed formats   "+0.00;-0.00" (a positive and a negative pattern) or a
+ *                    leading sign. TradingView prints "+1.23" / "-0.50"; the
+ *                    stock engine prints the number at full length.
+ *   halves           209.5325 at three decimals. TradingView prints 209.533
+ *                    and the stock engine 209.532, yet 209.9765 prints 209.976
+ *                    on both. Eleven level prices read off the chart fit one
+ *                    rule and no other tried: round(value / step) * step, the
+ *                    step being the tick (what math.round_to_mintick does).
+ *                    Multiplying by 1000, rounding the stored digits and
+ *                    rounding half up each get at least one of them wrong.
+ *
+ * The number part is still formatted by the stock method. A format this does
+ * not recognise goes straight to it.
  */
-function installSignedFormats(context: unknown): void {
-  const str = (context as { pine?: { str?: Record<string, any> } })?.pine?.str;
+function installNumberFormats(context: unknown): void {
+  const pine = (context as { pine?: Record<string, any> })?.pine;
+  const str = pine?.str;
   if (!str || typeof str.tostring !== 'function') return;
   const stock = str.tostring.bind(str);
   const plain = (v: unknown): unknown => {
@@ -270,18 +281,39 @@ function installSignedFormats(context: unknown): void {
     if (x && typeof x === 'object' && typeof x.get === 'function') x = x.get(0);
     return x;
   };
+  const decimalsOf = (pattern: string): number | null => {
+    if (!/^[0#,]*(\.[0#]+)?$/.test(pattern) || !/[0#]/.test(pattern)) return null;
+    const dot = pattern.indexOf('.');
+    return dot < 0 ? 0 : pattern.length - dot - 1;
+  };
+  // Divide by the step, as the chart does: 209.9765 / 0.001 lands just under the half, 209.5325 / 0.001 on it.
+  const exactRound = (v: number, decimals: number): number => {
+    if (decimals > 12) return v;
+    const step = Number(`1e-${decimals}`);
+    return Number((Math.round(v / step) * step).toFixed(decimals));
+  };
   str.tostring = (value: unknown, format?: unknown, ...rest: unknown[]) => {
     const f = plain(format);
     const v = plain(value);
     if (typeof f !== 'string' || typeof v !== 'number' || !Number.isFinite(v)) return stock(value, format, ...rest);
-    if (!f.includes(';') && !/^[+-]/.test(f)) return stock(value, format, ...rest);
+
+    if (f === 'mintick') {
+      const tick = Number(pine?.syminfo?.mintick);
+      const decimals = tick > 0 && tick < 1 ? Math.round(-Math.log10(tick)) : null;
+      return decimals === null || decimals > 12 ? stock(value, format, ...rest) : stock(exactRound(v, decimals), format, ...rest);
+    }
+
     const [positive, negative] = f.split(';');
+    const signed = f.includes(';') || /^[+-]/.test(f);
     const pattern = v < 0 && negative !== undefined ? negative : positive!;
-    const m = /^([^0#.,]*)([0#.,]+)(.*)$/.exec(pattern);
+    const m = signed ? /^([^0#.,]*)([0#.,]+)(.*)$/.exec(pattern) : /^()([0#.,]+)()$/.exec(pattern);
     if (!m) return stock(value, format, ...rest);
+    const decimals = decimalsOf(m[2]!);
+    const magnitude = decimals === null ? Math.abs(v) : exactRound(Math.abs(v), decimals);
+    if (!signed) return decimals === null ? stock(value, format, ...rest) : stock(Math.sign(v) * magnitude, m[2], ...rest);
     // One pattern and a negative number: the sign replaces the pattern's own "+".
     const prefix = v < 0 && negative === undefined ? '-' + m[1]!.replace(/^[+-]/, '') : m[1];
-    return prefix + stock(Math.abs(v), m[2]) + m[3];
+    return prefix + stock(magnitude, m[2]) + m[3];
   };
 }
 
