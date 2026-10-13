@@ -4,8 +4,11 @@
 // Corresponding source: https://github.com/QuantPad/pine-runner
 // Modified by QuantPad (2026): feeds QuantPad OHLCV into the upstream
 // Pine engine via its market-data provider interface.
+// Modified by jam2205 (2026): higher-timeframe bars are cut on the symbol's
+// session when it declares one (session.ts); monthly bars are built at all.
 import { toPineCandles } from './normalize';
-import { resampleOhlcvBars } from './resample';
+import { resampleBySession, resampleOhlcvBars } from './resample';
+import { sessionSpec, tfMs as sessionTfMs } from './session';
 import { type OhlcvBar, type PineCandle, type PineSymbolInfo } from './types';
 
 const SECOND_MS = 1_000;
@@ -58,6 +61,8 @@ export function createQuantPadPineProvider(params: {
   // provider at the script-requested timeframe. Resampled series are cached
   // since a script's security calls repeat the same timeframe every run.
   const resampleCache = new Map<number, PineCandle[]>();
+  const session = sessionSpec(info);
+  const sessionCache = new Map<string, PineCandle[] | null>();
 
   return {
     async getMarketData(
@@ -69,6 +74,28 @@ export function createQuantPadPineProvider(params: {
     ) {
       const tfMs = pineTimeframeStringToMs(timeframe);
       let series = candles;
+      // A symbol with a session gets its coarser bars cut on that session: days
+      // from the session start, weeks from the week's first session, months,
+      // and intraday bars counted from the session start. Same +1ms parity
+      // nudge as below, for the same reason.
+      const wantMs = session ? sessionTfMs(timeframe) : null;
+      if (session && timeframe && wantMs != null && wantMs > params.barMs) {
+        const key = timeframe.trim().toUpperCase();
+        let cut = sessionCache.get(key);
+        if (cut === undefined) {
+          const bars = resampleBySession(params.bars, key, session);
+          cut = bars
+            ? toPineCandles(bars, wantMs).map((candle) => ({ ...candle, closeTime: candle.closeTime + 1 }))
+            : null;
+          // The last bar is still open: it must reach past the last chart bar
+          // however long the period is (a 31-day month, a week with a holiday).
+          const lastChart = candles[candles.length - 1];
+          const lastCut = cut?.[cut.length - 1];
+          if (lastChart && lastCut) lastCut.closeTime = Math.max(lastCut.closeTime, lastChart.closeTime + 1);
+          sessionCache.set(key, cut);
+        }
+        if (cut) series = cut;
+      } else
       // Coarser multiples of the chart timeframe are aggregated from the held
       // bars (e.g. "5"-minute security data on a 1m chart). Finer or
       // non-multiple requests fall back to the chart bars — we can't

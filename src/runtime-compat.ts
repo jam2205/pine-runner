@@ -38,6 +38,8 @@
  *    unwrap helper objects to their current bar value at record time.
  */
 
+import { sessionBarStart, sessionSpec, tradingDay, type SessionSpec } from './session';
+
 const DECLARATION_RE = /^[ \t]*(strategy|indicator)[ \t]*\(/m;
 
 export interface PineDeclarationScan {
@@ -157,8 +159,102 @@ export function patchPineRuntimeClassCompat(engineClass: unknown): void {
   proto._initializeContext = function patched(this: unknown, ...args: unknown[]) {
     const context = (original as (...a: unknown[]) => unknown).apply(this, args);
     installParamsTimeUnwrap(context);
+    installSessionCalendar(context);
     return context;
   };
+}
+
+/**
+ * Modified by jam2205 (2026). Make the engine's calendar follow the symbol's
+ * session (session.ts) in the three places a script asks "has a new day, week
+ * or month started?":
+ *
+ *   timeframe.change(tf)   stock: the UTC calendar period changed
+ *   time(tf)               stock: the UTC-aligned period start
+ *   time_tradingday        stock: the calendar date of the bar's close
+ *
+ * Each falls back to the stock method when the symbol declares no session, the
+ * call has a shape this does not handle (time() with a session or bars_back
+ * argument), or anything it needs is missing. Installed on every context, the
+ * secondary ones request.security() builds included.
+ *
+ * Relies on `context.pine.timeframe`, `.time` and `.syminfo` keeping those
+ * names; __tests__/session-calendar.test.ts fails if a future engine build
+ * moves them, so this cannot go quiet unnoticed.
+ */
+function installSessionCalendar(context: unknown): void {
+  if (!context || typeof context !== 'object') return;
+  const ctx = context as { pine?: Record<string, any>; data?: Record<string, unknown>; timeframe?: string };
+  const pine = ctx.pine;
+  if (!pine || typeof pine !== 'object') return;
+
+  let cachedFor: unknown;
+  let cached: SessionSpec | null = null;
+  const spec = (): SessionSpec | null => {
+    const info = pine.syminfo;
+    if (info !== cachedFor) {
+      cachedFor = info;
+      cached = sessionSpec(info);
+    }
+    return cached;
+  };
+  const text = (v: unknown): string | null => {
+    let x: any = typeof v === 'function' ? v() : v;
+    if (x && typeof x === 'object' && typeof x.get === 'function') x = x.get(0);
+    return typeof x === 'string' ? x : null;
+  };
+  const openTime = (back: number): number => {
+    const helper = pine.time;
+    const store = ctx.data?.openTime;
+    if (!helper || typeof helper.param !== 'function' || store == null) return NaN;
+    return Number(helper.param(store, back));
+  };
+
+  const tfHelper = pine.timeframe;
+  if (tfHelper && typeof tfHelper.change === 'function') {
+    const stock = tfHelper.change.bind(tfHelper);
+    tfHelper.change = (timeframe: unknown) => {
+      const s = spec();
+      const tf = text(timeframe);
+      const now = openTime(0);
+      const before = openTime(1);
+      if (!s || !tf || !Number.isFinite(now) || !Number.isFinite(before)) return stock(timeframe);
+      const a = sessionBarStart(now, tf, s);
+      const b = sessionBarStart(before, tf, s);
+      return a === null || b === null ? stock(timeframe) : a !== b;
+    };
+  }
+
+  const timeHelper = pine.time;
+  if (timeHelper && typeof timeHelper.any === 'function') {
+    const stock = timeHelper.any.bind(timeHelper);
+    timeHelper.any = (...args: unknown[]) => {
+      const s = spec();
+      const tf = args.length === 1 ? text(args[0]) : null;
+      const now = openTime(0);
+      if (!s || !tf || !Number.isFinite(now) || sameTimeframe(tf, ctx.timeframe)) return stock(...args);
+      return sessionBarStart(now, tf, s) ?? stock(...args);
+    };
+  }
+
+  const stockDay = Object.getOwnPropertyDescriptor(pine, 'time_tradingday');
+  if (stockDay?.configurable) {
+    Object.defineProperty(pine, 'time_tradingday', {
+      configurable: true,
+      enumerable: stockDay.enumerable,
+      get() {
+        const s = spec();
+        const now = openTime(0);
+        if (!s || !Number.isFinite(now)) return stockDay.get ? stockDay.get.call(pine) : stockDay.value;
+        return tradingDay(now, s) * 86_400_000;
+      },
+    });
+  }
+}
+
+function sameTimeframe(a: string, b: string | undefined): boolean {
+  const norm = (v: string | undefined) => String(v ?? '').trim().toUpperCase().replace(/^1([DWM])$/, '$1');
+  return norm(a) === norm(b);
 }
 
 /**

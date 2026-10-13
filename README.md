@@ -98,3 +98,20 @@ regenerated from this source.
 AGPL-3.0-only. See [LICENSE](./LICENSE). This program is distributed WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
+
+## Changes in this fork (jam2205)
+
+This fork differs from QuantPad's runner in one area, session-aware bar boundaries
+(`src/session.ts`, 2026-10-13):
+
+- A symbol whose `symbolInfo` carries a `session` ("1700-1700") and a `timezone` gets its
+  higher-timeframe bars cut on that session: the day starts at the session start (17:00 New York
+  for spot FX, so Sunday's evening open is Monday), the week at the week's first session, the month
+  at its first weekday session, and intraday bars are counted from the session start.
+  `request.security` to a monthly timeframe now gets monthly bars at all.
+- `timeframe.change()`, `time(timeframe)` and `time_tradingday` follow the same calendar, through
+  a runtime patch in `src/runtime-compat.ts`.
+- A symbol with no session, or a midnight-UTC one, behaves exactly as upstream.
+
+Not covered: `time_close(timeframe)`, `time()` called with a session or `bars_back` argument, and
+multi-day or multi-week timeframes beyond simple grouping. Tests: `__tests__/session-calendar.test.ts`.
