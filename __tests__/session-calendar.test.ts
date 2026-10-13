@@ -87,6 +87,31 @@ function fxBars(): OhlcvBar[] {
 
 const within = (bars: OhlcvBar[], from: string, to: string) => bars.filter((b) => b.t >= utc(from) && b.t < utc(to));
 
+describe('a day that starts early (IG: Monday opens 16:00 New York on Sunday)', () => {
+  const ig = sessionSpec({ session: '1600F-1700:2|1700-1700:3456', timezone: 'America/New_York' })!;
+  it('keeps the common start and records the early one', () => {
+    expect(ig).toEqual({ timezone: 'America/New_York', startMin: 1020, startByDay: { 1: 960 } });
+  });
+  it("counts Monday's bars from Sunday 16:00 and the other days' from 17:00, as the chart does", () => {
+    // TradingView's own 4-hour bars on IG:GBPJPY, Mon 12 Oct 2026: 20:00 (Sun), 00:00, 04:00 ... 16:00, a
+    // one-hour bar at 20:00, then Tuesday's from 21:00.
+    expect(iso(sessionBarStart(utc('2026-10-11T20:15'), '240', ig))).toBe('2026-10-11T20:00');
+    expect(iso(sessionBarStart(utc('2026-10-12T03:45'), '240', ig))).toBe('2026-10-12T00:00');
+    expect(iso(sessionBarStart(utc('2026-10-12T20:30'), '240', ig))).toBe('2026-10-12T20:00');
+    expect(iso(sessionBarStart(utc('2026-10-12T21:00'), '240', ig))).toBe('2026-10-12T21:00');
+    expect(iso(sessionBarStart(utc('2026-10-13T02:00'), '240', ig))).toBe('2026-10-13T01:00');
+    expect(iso(sessionBarStart(utc('2026-10-12T12:00'), 'D', ig))).toBe('2026-10-11T20:00');
+    expect(iso(sessionBarStart(utc('2026-10-13T12:00'), 'W', ig))).toBe('2026-10-11T20:00');
+  });
+  it("stamps months as the chart's monthly bars are stamped", () => {
+    // TradingView's monthly bars on IG:GBPJPY: 30 Sep 21:00, 2 Aug 20:00 (1 Aug is a Saturday), 31 May 20:00, 1 Mar 21:00 UTC.
+    expect(iso(sessionBarStart(utc('2026-10-13T12:00'), 'M', ig))).toBe('2026-09-30T21:00');
+    expect(iso(sessionBarStart(utc('2026-08-20T12:00'), 'M', ig))).toBe('2026-08-02T20:00');
+    expect(iso(sessionBarStart(utc('2026-06-10T12:00'), 'M', ig))).toBe('2026-05-31T20:00');
+    expect(iso(sessionBarStart(utc('2026-03-10T12:00'), 'M', ig))).toBe('2026-03-01T21:00');
+  });
+});
+
 describe('resampleBySession', () => {
   const s = sessionSpec(NY)!;
   const bars = fxBars();

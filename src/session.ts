@@ -28,14 +28,24 @@ export interface SessionSpec {
   timezone: string;
   /** Minutes after local midnight at which the trading day starts (1020 = 17:00). */
   startMin: number;
+  /**
+   * Trading days that start at a different time, by weekday of the trading day
+   * (0 = Sunday). IG's Monday starts at 16:00 on Sunday: { 1: 960 }.
+   */
+  startByDay?: Record<number, number>;
 }
 
 /**
  * Reads the day's start from a TradingView session string. Accepts the plain
  * form ("1700-1700") and the per-day form TradingView reports for a symbol
- * ("1600F-1700:2|1700-1700:3456"): the start that covers the most days wins,
- * and a day that opens early (IG's Sunday 16:00) is handled by the weekend
- * rule in `tradingDay`, not here.
+ * ("1600F-1700:2|1700-1700:3456", days numbered 1 = Sunday): the start that
+ * covers the most days is the day's start, and a day listed with a different
+ * one (IG's Monday, 16:00 on Sunday) keeps it in `startByDay`. Which day a bar
+ * belongs to is still decided by the common start plus the weekend rule in
+ * `tradingDay`; the per-day start only moves where that day's bars are counted
+ * from. Measured on IG:GBPJPY 2026-10-13: TradingView's Monday 4-hour bars run
+ * 20:00, 00:00, 04:00 ... UTC and a month that begins on a Monday is stamped
+ * Sunday 20:00 UTC.
  */
 export function sessionSpec(
   info: { session?: unknown; timezone?: unknown } | null | undefined,
@@ -45,15 +55,22 @@ export function sessionSpec(
   if (!session || !timezone) return null;
 
   const weight = new Map<number, number>();
+  const listed: [number, number][] = []; // [weekday 0 = Sunday, start]
   for (const part of session.split('|')) {
     const m = /^(\d{2})(\d{2})F?-(\d{2})(\d{2})(?::(\d+))?$/.exec(part.trim());
     if (!m) continue;
     const start = Number(m[1]) * 60 + Number(m[2]);
     if (start >= 1440) continue;
     weight.set(start, (weight.get(start) ?? 0) + (m[5] ? m[5].length : 5));
+    for (const digit of m[5] ?? '') {
+      const d = Number(digit);
+      if (d >= 1 && d <= 7) listed.push([d - 1, start]);
+    }
   }
   if (weight.size === 0) return null;
   const startMin = [...weight.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+  const startByDay: Record<number, number> = {};
+  for (const [weekday, start] of listed) if (start !== startMin && start > 0) startByDay[weekday] = start;
 
   try {
     formatter(timezone);
@@ -63,7 +80,7 @@ export function sessionSpec(
   if (startMin === 0 && offsetMs(0, timezone) === 0 && offsetMs(Date.UTC(2026, 6, 1), timezone) === 0) {
     return null; // midnight UTC is the stock calendar
   }
-  return { timezone, startMin };
+  return Object.keys(startByDay).length ? { timezone, startMin, startByDay } : { timezone, startMin };
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
@@ -128,7 +145,8 @@ export function tradingDay(t: number, spec: SessionSpec, mergeWeekend = true): n
 
 /** The UTC instant at which trading day `dayIdx` starts. */
 export function tradingDayStart(dayIdx: number, spec: SessionSpec): number {
-  const wall = dayIdx * DAY_MS - (spec.startMin > 0 ? (1440 - spec.startMin) * MIN_MS : 0);
+  const start = spec.startByDay?.[weekdayOf(dayIdx)] ?? spec.startMin;
+  const wall = dayIdx * DAY_MS - (start > 0 ? (1440 - start) * MIN_MS : 0);
   return wallToUtc(wall, spec.timezone);
 }
 
@@ -176,8 +194,9 @@ export function sessionBarStart(t: number, timeframe: string, spec: SessionSpec)
   if (!tf) return null;
   if (tf.unit === 'S' || tf.unit === '') {
     const step = tf.unit === 'S' ? tf.n * 1000 : tf.n * MIN_MS;
-    // Intraday bars restart at each session start, weekend or not.
-    const dayStart = tradingDayStart(tradingDay(t, spec, false), spec);
+    // Intraday bars restart at each trading day's start. A bar before it (a feed
+    // that opens ahead of the session on Sunday) falls in a block of its own.
+    const dayStart = tradingDayStart(tradingDay(t, spec), spec);
     return dayStart + Math.floor((t - dayStart) / step) * step;
   }
   const day = tradingDay(t, spec);

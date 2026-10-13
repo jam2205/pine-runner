@@ -111,6 +111,8 @@ This fork differs from QuantPad's runner in one area, session-aware bar boundari
   `request.security` to a monthly timeframe now gets monthly bars at all.
 - `timeframe.change()`, `time(timeframe)` and `time_tradingday` follow the same calendar, through
   a runtime patch in `src/runtime-compat.ts`.
+- TradingView's per-day session form is read too ("1600F-1700:2|1700-1700:3456", IG's FX): a day
+  that starts early has its bars counted from that start.
 - A symbol with no session, or a midnight-UTC one, behaves exactly as upstream.
 
 Not covered: `time_close(timeframe)`, `time()` called with a session or `bars_back` argument, and
