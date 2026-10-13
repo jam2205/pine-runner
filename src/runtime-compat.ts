@@ -160,6 +160,7 @@ export function patchPineRuntimeClassCompat(engineClass: unknown): void {
     const context = (original as (...a: unknown[]) => unknown).apply(this, args);
     installParamsTimeUnwrap(context);
     installSessionCalendar(context);
+    installSignedFormats(context);
     return context;
   };
 }
@@ -250,6 +251,38 @@ function installSessionCalendar(context: unknown): void {
       },
     });
   }
+}
+
+/**
+ * Modified by jam2205 (2026). `str.tostring(x, "+0.00;-0.00")`: a format with
+ * a positive and a negative pattern, or a leading sign, which TradingView
+ * prints as "+1.23" / "-0.50". The stock engine does not know the form and
+ * prints the number at full length ("1.2345600000"). The number part is still
+ * formatted by the stock method; only the pattern choice and the text around
+ * it are handled here. Any other format goes straight to the stock method.
+ */
+function installSignedFormats(context: unknown): void {
+  const str = (context as { pine?: { str?: Record<string, any> } })?.pine?.str;
+  if (!str || typeof str.tostring !== 'function') return;
+  const stock = str.tostring.bind(str);
+  const plain = (v: unknown): unknown => {
+    let x: any = typeof v === 'function' ? v() : v;
+    if (x && typeof x === 'object' && typeof x.get === 'function') x = x.get(0);
+    return x;
+  };
+  str.tostring = (value: unknown, format?: unknown, ...rest: unknown[]) => {
+    const f = plain(format);
+    const v = plain(value);
+    if (typeof f !== 'string' || typeof v !== 'number' || !Number.isFinite(v)) return stock(value, format, ...rest);
+    if (!f.includes(';') && !/^[+-]/.test(f)) return stock(value, format, ...rest);
+    const [positive, negative] = f.split(';');
+    const pattern = v < 0 && negative !== undefined ? negative : positive!;
+    const m = /^([^0#.,]*)([0#.,]+)(.*)$/.exec(pattern);
+    if (!m) return stock(value, format, ...rest);
+    // One pattern and a negative number: the sign replaces the pattern's own "+".
+    const prefix = v < 0 && negative === undefined ? '-' + m[1]!.replace(/^[+-]/, '') : m[1];
+    return prefix + stock(Math.abs(v), m[2]) + m[3];
+  };
 }
 
 function sameTimeframe(a: string, b: string | undefined): boolean {

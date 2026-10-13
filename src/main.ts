@@ -44,7 +44,12 @@ async function handle(req: PineRunnerRequest): Promise<PineRunnerResponse> {
   }
   if (req.op === 'run') {
     const bars = readBars(req.barsFile);
-    return { ok: true, result: await runPine(req, bars) };
+    const extra = (req.extraSeries ?? []).map((s) => ({
+      ticker: s.ticker,
+      barMs: s.barMs,
+      bars: readBars(s.barsFile),
+    }));
+    return { ok: true, result: await runPine(req, bars, extra) };
   }
   return {
     ok: false,

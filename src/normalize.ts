@@ -177,6 +177,20 @@ function finiteNumber(raw: unknown): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Modified by jam2205 (2026). A script in its own pane draws on the PRICE pane
+ * with `force_overlay = true`; the engine keeps those under `__boxes_overlay__`
+ * (and `__lines_overlay__`, `__labels_overlay__`), which were never read, so a
+ * script's levels and zones on the price were silently missing. Both sets are
+ * returned; the overlay ones carry `forceOverlay: true`.
+ */
+function drawingValues(plots: unknown, key: string): Record<string, unknown>[] {
+  return [
+    ...latestDrawingValues(plots, key),
+    ...latestDrawingValues(plots, key.replace(/__$/, '_overlay__')),
+  ];
+}
+
 function latestDrawingValues(plots: unknown, key: string): Record<string, unknown>[] {
   if (!plots || typeof plots !== 'object') return [];
   const plot = (plots as Record<string, unknown>)[key];
@@ -219,6 +233,7 @@ function normalizeLineDrawing(
     color: cleanColor(raw.color),
     style: typeof raw.style === 'string' ? raw.style : undefined,
     width: finiteNumber(raw.width) ?? undefined,
+    ...(raw.force_overlay === true ? { forceOverlay: true } : {}),
   };
 }
 
@@ -476,7 +491,7 @@ export function normalizePineDrawings(plots: unknown): PineChartDrawing[] {
     });
   }
 
-  for (const raw of latestDrawingValues(plots, '__boxes__')) {
+  for (const raw of drawingValues(plots, '__boxes__')) {
     const left = finiteNumber(raw.left);
     const top = finiteNumber(raw.top);
     const right = finiteNumber(raw.right);
@@ -496,6 +511,7 @@ export function normalizePineDrawings(plots: unknown): PineChartDrawing[] {
       backgroundColor: cleanColor(raw.bgcolor),
       text: typeof raw.text === 'string' ? raw.text : undefined,
       textColor: cleanColor(raw.text_color),
+      ...(raw.force_overlay === true ? { forceOverlay: true } : {}),
     });
   }
 
@@ -525,12 +541,12 @@ export function normalizePineDrawings(plots: unknown): PineChartDrawing[] {
     });
   }
 
-  for (const raw of latestDrawingValues(plots, '__lines__')) {
+  for (const raw of drawingValues(plots, '__lines__')) {
     const line = normalizeLineDrawing(raw);
     if (line) drawings.push(line);
   }
 
-  for (const raw of latestDrawingValues(plots, '__labels__')) {
+  for (const raw of drawingValues(plots, '__labels__')) {
     const x = finiteNumber(raw.x);
     const y = finiteNumber(raw.y);
     if (x == null || y == null) continue;
@@ -546,6 +562,7 @@ export function normalizePineDrawings(plots: unknown): PineChartDrawing[] {
       textColor: cleanColor(raw.textcolor),
       style: typeof raw.style === 'string' ? raw.style : undefined,
       size: typeof raw.size === 'string' ? raw.size : undefined,
+      ...(raw.force_overlay === true ? { forceOverlay: true } : {}),
     });
   }
 

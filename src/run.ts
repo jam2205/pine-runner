@@ -5,7 +5,7 @@
 import { loadPineEngine } from './engine';
 import { normalizePineVisuals, rebaseDrawingsToTime, trimVisualsToWindow } from './normalize';
 import { type RunRequest, type RunResult, type ScanRequest, type ScanResult } from './protocol';
-import { createQuantPadPineProvider } from './provider';
+import { createQuantPadPineProvider, type ExtraSeries } from './provider';
 import {
   patchPineRuntimeClassCompat,
   patchPineRuntimeCompat,
@@ -83,7 +83,11 @@ function extractStrategyState(strategy: unknown): Record<string, unknown> | null
 }
 
 /** Execute a Pine script over `bars` and return normalized visuals + state. */
-export async function runPine(req: RunRequest, bars: OhlcvBar[]): Promise<RunResult> {
+export async function runPine(
+  req: RunRequest,
+  bars: OhlcvBar[],
+  extraSeries: ExtraSeries[] = [],
+): Promise<RunResult> {
   const { PineEngine, PineIndicator } = loadPineEngine();
   patchPineRuntimeClassCompat(PineEngine);
 
@@ -97,6 +101,7 @@ export async function runPine(req: RunRequest, bars: OhlcvBar[]): Promise<RunRes
     bars,
     barMs: req.barMs,
     symbolInfo: req.symbolInfo,
+    extraSeries,
   });
   const engine = new PineEngine(provider, req.symbol, req.timeframe, bars.length);
   patchPineRuntimeCompat(engine, {
@@ -126,6 +131,7 @@ export async function runPine(req: RunRequest, bars: OhlcvBar[]): Promise<RunRes
     stale,
     declarationType,
     inputsMeta,
+    requestedSymbols: provider.requestedSymbols(),
   };
 }
 

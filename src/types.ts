@@ -79,6 +79,8 @@ export interface PineChartBarColor {
 
 export interface PineChartLineDrawing {
   kind: 'line';
+  /** Drawn on the price pane by a script that lives in its own pane (`force_overlay`). */
+  forceOverlay?: boolean;
   id: string;
   x1: number;
   y1: number;
@@ -92,6 +94,8 @@ export interface PineChartLineDrawing {
 
 export interface PineChartBoxDrawing {
   kind: 'box';
+  /** Drawn on the price pane by a script that lives in its own pane (`force_overlay`). */
+  forceOverlay?: boolean;
   id: string;
   left: number;
   top: number;
@@ -108,6 +112,8 @@ export interface PineChartBoxDrawing {
 
 export interface PineChartLabelDrawing {
   kind: 'label';
+  /** Drawn on the price pane by a script that lives in its own pane (`force_overlay`). */
+  forceOverlay?: boolean;
   id: string;
   x: number;
   y: number;

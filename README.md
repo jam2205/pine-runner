@@ -115,5 +115,22 @@ This fork differs from QuantPad's runner in one area, session-aware bar boundari
   that starts early has its bars counted from that start.
 - A symbol with no session, or a midnight-UTC one, behaves exactly as upstream.
 
+Also in this fork (2026-10-13):
+
+- **Other symbols.** The provider no longer ignores the requested ticker. The chart's own symbol
+  gets the chart's bars; a symbol listed in the request's `extraSeries` gets those bars (carried
+  forward if they stop before the chart does); any other symbol gets no bars, so the script sees
+  `na` where it used to be handed the chart's bars under another name. `RunResult.requestedSymbols`
+  lists what was asked for, so the parent can supply it and run again.
+- **Price-pane drawings.** Boxes, lines and labels drawn with `force_overlay = true` are returned
+  (`forceOverlay: true`); they were dropped.
+- **Signed formats.** `str.tostring(x, "+0.00;-0.00")` prints as TradingView does.
+
+Known gaps in the pinned engine (pinets 0.9.27) that a script has to avoid: a tuple returned from
+`request.security` through a user function; a local or global variable sharing a name with a
+namespace or a function parameter (`order`, `name`). On the last bar a `request.security` without
+lookahead returns the last COMPLETED higher-timeframe bar, where a live chart shows the forming one.
+pinets 0.11.1 fixes the first but breaks four of this runner's tests; the upgrade is not done.
+
 Not covered: `time_close(timeframe)`, `time()` called with a session or `bars_back` argument, and
 multi-day or multi-week timeframes beyond simple grouping. Tests: `__tests__/session-calendar.test.ts`.

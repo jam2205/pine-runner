@@ -34,6 +34,29 @@ export interface RunRequest {
   displayStartMs: number | null;
   /** True when the run window is wider than the display window. */
   windowed: boolean;
+  /**
+   * Modified by jam2205 (2026). Bars for symbols OTHER than the chart's, for
+   * `request.security("TVC:US02Y", ...)`. `ticker` is what the script asks for;
+   * the match ignores case. A symbol the script asks for that is neither the
+   * chart's nor listed here gets no data (na), and is reported back in
+   * `requestedSymbols` so the parent can supply it and run again.
+   */
+  extraSeries?: ExtraSeriesRef[];
+}
+
+export interface ExtraSeriesRef {
+  ticker: string;
+  /** Millisecond duration of one bar of this series (86_400_000 for daily). */
+  barMs: number;
+  /** Path to a JSON array of compact rows [t,o,h,l,c,v]. */
+  barsFile: string;
+}
+
+export interface RequestedSymbol {
+  /** Without its exchange prefix, upper case: the engine drops the prefix before asking. */
+  ticker: string;
+  /** True when bars were supplied for it in `extraSeries`. */
+  supplied: boolean;
 }
 
 export interface ScanRequest {
@@ -53,6 +76,8 @@ export interface RunResult {
   stale: PineStaleKeys;
   declarationType: PineDeclarationType;
   inputsMeta: IPineInput[];
+  /** Symbols other than the chart's that the script requested, in first-asked order. */
+  requestedSymbols: RequestedSymbol[];
 }
 
 export type ScanResult = ResolvedPineSettings;
