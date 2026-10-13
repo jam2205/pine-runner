@@ -3,7 +3,7 @@
 // Copyright (C) 2026 QuantPad. Licensed under the GNU AGPL-3.0; see ../LICENSE.
 // Corresponding source: https://github.com/QuantPad/pine-runner
 // Modified by jam2205 (2026): resampleBySession, bars cut on the symbol's session.
-import { sessionBarStart, type SessionSpec } from './session';
+import { sessionBarStart, tradingDay, type SessionSpec } from './session';
 import { type OhlcvBar } from './types';
 
 function bucketStart(t: number, bucketMs: number): number {
@@ -80,4 +80,39 @@ export function resampleBySession(
     prev.v += bar.v;
   }
   return out;
+}
+
+/**
+ * Modified by jam2205 (2026). One daily series from two sources: `history`,
+ * daily bars supplied by the parent (years of them), and `derived`, daily bars
+ * cut from the chart's own intraday bars (the last days or weeks, live).
+ *
+ * Why: a script that asks for daily, weekly or monthly values gets them from
+ * the bars the run holds, and an intraday run holds days, not years. A 20-day
+ * average range, last month's high or a gap opened two years ago cannot come
+ * out of 500 fifteen-minute bars, where the chart, which has the whole daily
+ * history behind it, shows all three.
+ *
+ * Days are matched by trading day. A day only one source has is taken as is.
+ * A day both have is the supplied bar's open, the wider high and low, and the
+ * derived bar's close and time -- the supplied bar may have been saved while
+ * that day was still trading, and the intraday bars are the newer reading.
+ */
+export function mergeDaily(history: OhlcvBar[], derived: OhlcvBar[], spec: SessionSpec): OhlcvBar[] {
+  const byDay = new Map<number, OhlcvBar>();
+  for (const bar of history) {
+    if (![bar.t, bar.o, bar.h, bar.l, bar.c].every(Number.isFinite)) continue;
+    byDay.set(tradingDay(bar.t, spec), { ...bar });
+  }
+  for (const bar of derived) {
+    const day = tradingDay(bar.t, spec);
+    const old = byDay.get(day);
+    byDay.set(
+      day,
+      old
+        ? { t: Math.min(old.t, bar.t), o: old.o, h: Math.max(old.h, bar.h), l: Math.min(old.l, bar.l), c: bar.c, v: bar.v }
+        : { ...bar },
+    );
+  }
+  return [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([, bar]) => bar);
 }

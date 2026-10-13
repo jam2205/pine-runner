@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadPineEngine } from '../src/engine';
 import { createQuantPadPineProvider } from '../src/provider';
-import { resampleBySession } from '../src/resample';
+import { mergeDaily, resampleBySession } from '../src/resample';
 import { patchPineRuntimeClassCompat } from '../src/runtime-compat';
 import { sessionBarStart, sessionSpec, tradingDay } from '../src/session';
 import type { OhlcvBar, PineSymbolInfo } from '../src/types';
@@ -192,5 +192,64 @@ describe('the engine, on a symbol with a 17:00 New York session', () => {
     const utcMonday = within(bars, '2026-10-12T00:00', '2026-10-13T00:00');
     expect(v.pdc_change).toBeCloseTo(utcMonday[utcMonday.length - 1]!.c, 10);
     expect(iso(v.day_time!)).toBe('2026-10-13T00:00');
+  });
+});
+
+describe('daily history behind an intraday run', () => {
+  const s = sessionSpec(NY)!;
+  const bars = fxBars(); // 15-minute bars, Wed 7 Oct 21:00 UTC to Tue 13 Oct 01:00 UTC
+  // Forty daily bars ending on the trading day of Thu 8 Oct (the bar that opens Wed 7 Oct 21:00 UTC),
+  // stamped 21:00 UTC, weekends skipped. Highs 2.00, 2.01, ... so each is unmistakable.
+  const history: OhlcvBar[] = [];
+  for (let t = utc('2026-10-07T21:00'), i = 0; history.length < 40; t -= 86_400_000) {
+    const wd = new Date(t).getUTCDay();
+    if (wd === 5 || wd === 6) continue; // bars opening Fri 21:00 and Sat 21:00 do not exist
+    history.unshift({ t, o: 1.39, h: 2 + (39 - i) * 0.01, l: 1.3, c: 1.395, v: 0 });
+    i++;
+  }
+
+  it('gives a 20-day lookback 500 fifteen-minute bars cannot', async () => {
+    const run = async (dailyHistory?: OhlcvBar[]) => {
+      const { PineEngine, PineIndicator } = loadPineEngine();
+      patchPineRuntimeClassCompat(PineEngine);
+      const info = { tickerid: 'USDCAD', ticker: 'USDCAD', type: 'forex', mintick: 0.00001, pricescale: 100000, currency: 'CAD', ...NY } as unknown as PineSymbolInfo;
+      const provider = createQuantPadPineProvider({ symbol: 'USDCAD', bars, barMs: 15 * MIN, symbolInfo: info, dailyHistory });
+      const src = `//@version=6
+indicator("hist")
+hh = request.security(syminfo.tickerid, "D", ta.highest(high, 20)[1], lookahead = barmerge.lookahead_on)
+mo = request.security(syminfo.tickerid, "M", open, lookahead = barmerge.lookahead_on)
+far = request.security(syminfo.tickerid, "D", ta.highest(high, 35)[1], lookahead = barmerge.lookahead_on)
+plot(hh, "hh20")
+plot(mo, "month_open")
+plot(far, "hh35")
+`;
+      const context = await new PineEngine(provider, 'USDCAD', '15', bars.length).run(new PineIndicator(src));
+      const out: Record<string, number> = {};
+      for (const [name, plot] of Object.entries(context.plots as Record<string, { data: { value: number }[] }>)) {
+        out[name] = plot.data[plot.data.length - 1]!.value;
+      }
+      return out;
+    };
+    const without = await run();
+    expect(Number.isFinite(without.hh20)).toBe(false); // four days of bars: no 20-day high
+    const withHistory = await run(history);
+    // The 20 completed days before the last one include the supplied bars; their highest high is the
+    // newest supplied bar's own (2.39) unless a chart-derived day is higher, and those are near 1.40.
+    expect(withHistory.hh20).toBeCloseTo(2.39, 10);
+    expect(withHistory.month_open).toBeCloseTo(1.39, 10); // October's first bar is a supplied one
+    // 35 trading days is about 50 calendar days back: past the 30 days the engine would normally ask for.
+    expect(withHistory.hh35).toBeCloseTo(2.39, 10);
+  });
+
+  it('merges a day both sources have: supplied open, wider range, derived close', () => {
+    const derived = resampleBySession(bars, 'D', s)!;
+    const merged = mergeDaily(history, derived, s);
+    const day = merged.find((b) => iso(b.t) === '2026-10-07T21:00')!; // Thu 8 Oct, in both
+    const fromChart = derived.find((b) => iso(b.t) === '2026-10-07T21:00')!;
+    expect(day.o).toBe(1.39);
+    expect(day.h).toBeCloseTo(2.39, 10);
+    expect(day.l).toBe(1.3);
+    expect(day.c).toBe(fromChart.c);
+    expect(merged.length).toBe(40 + derived.length - 1);
   });
 });

@@ -122,6 +122,11 @@ Also in this fork (2026-10-13):
   forward if they stop before the chart does); any other symbol gets no bars, so the script sees
   `na` where it used to be handed the chart's bars under another name. `RunResult.requestedSymbols`
   lists what was asked for, so the parent can supply it and run again.
+- **Daily history behind an intraday run.** `dailyHistoryFile` in the request: daily bars for the chart's
+  own symbol from further back than the run's bars reach. Daily, weekly and monthly requests are served
+  from them joined to the days the intraday bars cover, and are not cut at the 30 days before the chart's
+  first bar the engine would otherwise ask for. A 20-day range or a gap opened years ago then comes out of
+  a 500-bar intraday run as it does on a chart.
 - **Price-pane drawings.** Boxes, lines and labels drawn with `force_overlay = true` are returned
   (`forceOverlay: true`); they were dropped.
 - **Number formats.** `str.tostring(x, "+0.00;-0.00")` prints as TradingView does, and a price is

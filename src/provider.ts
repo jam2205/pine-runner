@@ -8,7 +8,7 @@
 // session when it declares one (session.ts); monthly bars are built at all;
 // symbols other than the chart's are served from bars the parent supplies.
 import { toPineCandles } from './normalize';
-import { resampleBySession, resampleOhlcvBars } from './resample';
+import { mergeDaily, resampleBySession, resampleOhlcvBars } from './resample';
 import { sessionSpec, tfMs as sessionTfMs } from './session';
 import { type OhlcvBar, type PineCandle, type PineSymbolInfo } from './types';
 
@@ -53,7 +53,14 @@ export interface ExtraSeries {
 }
 
 /** One symbol's bars, served at whatever timeframe the engine asks for. */
-function createSeries(params: { bars: OhlcvBar[]; barMs: number; info: PineSymbolInfo; openUntil?: number }) {
+function createSeries(params: {
+  bars: OhlcvBar[];
+  barMs: number;
+  info: PineSymbolInfo;
+  openUntil?: number;
+  /** Daily bars for this symbol reaching further back than `bars` do (see mergeDaily). */
+  dailyHistory?: OhlcvBar[];
+}) {
   const candles: PineCandle[] = toPineCandles(params.bars, params.barMs);
   // A series carried forward stays open to the end of the chart, however far that is.
   const tail = candles[candles.length - 1];
@@ -64,10 +71,13 @@ function createSeries(params: { bars: OhlcvBar[]; barMs: number; info: PineSymbo
   const resampleCache = new Map<number, PineCandle[]>();
   const session = sessionSpec(params.info);
   const sessionCache = new Map<string, PineCandle[] | null>();
+  // Timeframes whose bars reach back through the supplied daily history.
+  const deep = new Set<string>();
 
   return (timeframe?: string, sDate?: number, eDate?: number): PineCandle[] => {
     const tfMs = pineTimeframeStringToMs(timeframe);
     let series = candles;
+    let fromHistory = false;
     // A symbol with a session gets its coarser bars cut on that session: days
     // from the session start, weeks from the week's first session, months,
     // and intraday bars counted from the session start. Same +1ms parity
@@ -77,7 +87,16 @@ function createSeries(params: { bars: OhlcvBar[]; barMs: number; info: PineSymbo
       const key = timeframe.trim().toUpperCase();
       let cut = sessionCache.get(key);
       if (cut === undefined) {
-        const bars = resampleBySession(params.bars, key, session);
+        let bars = resampleBySession(params.bars, key, session);
+        // Daily, weekly and monthly bars reach back through the supplied daily
+        // history when there is one, and are cut from the chart's own bars
+        // only for the days those cover.
+        const history = params.dailyHistory;
+        if (bars && history?.length && /^\d*[DWM]$/.test(key) && params.barMs < 86_400_000) {
+          const days = mergeDaily(history, resampleBySession(params.bars, 'D', session) ?? [], session);
+          bars = key === 'D' || key === '1D' ? days : resampleBySession(days, key, session);
+          deep.add(key);
+        }
         cut = bars
           ? toPineCandles(bars, wantMs).map((candle) => ({ ...candle, closeTime: candle.closeTime + 1 }))
           : null;
@@ -89,6 +108,7 @@ function createSeries(params: { bars: OhlcvBar[]; barMs: number; info: PineSymbo
         sessionCache.set(key, cut);
       }
       if (cut) series = cut;
+      fromHistory = deep.has(key);
     } else if (tfMs != null && tfMs !== params.barMs && tfMs % params.barMs === 0) {
       // Coarser multiples of the chart timeframe are aggregated from the held
       // bars (e.g. "5"-minute security data on a 1m chart). Finer or
@@ -115,7 +135,9 @@ function createSeries(params: { bars: OhlcvBar[]; barMs: number; info: PineSymbo
     if (sDate != null || eDate != null) {
       series = series.filter(
         (candle) =>
-          (sDate == null || candle.openTime >= sDate) &&
+          // The engine asks for higher-timeframe bars from 30 days before the chart's first bar.
+          // Supplied history is there precisely to reach further back than that, so it is not cut.
+          (sDate == null || fromHistory || candle.openTime >= sDate) &&
           (eDate == null || candle.openTime <= eDate),
       );
     }
@@ -144,9 +166,11 @@ export function createQuantPadPineProvider(params: {
   barMs: number;
   symbolInfo: PineSymbolInfo;
   extraSeries?: ExtraSeries[];
+  /** Daily bars for the chart's own symbol, older than the chart's bars reach. */
+  dailyHistory?: OhlcvBar[];
 }) {
   const info = params.symbolInfo;
-  const chart = createSeries({ bars: params.bars, barMs: params.barMs, info });
+  const chart = createSeries({ bars: params.bars, barMs: params.barMs, info, dailyHistory: params.dailyHistory });
   const own = new Set([bare(params.symbol), bare(info?.ticker), bare(info?.tickerid), ''].filter((v) => v !== undefined));
   const extras = new Map<string, ReturnType<typeof createSeries>>();
   const chartEnd = params.bars.length ? params.bars[params.bars.length - 1]!.t + params.barMs : 0;

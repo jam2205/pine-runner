@@ -49,7 +49,8 @@ async function handle(req: PineRunnerRequest): Promise<PineRunnerResponse> {
       barMs: s.barMs,
       bars: readBars(s.barsFile),
     }));
-    return { ok: true, result: await runPine(req, bars, extra) };
+    const daily = req.dailyHistoryFile ? readBars(req.dailyHistoryFile) : undefined;
+    return { ok: true, result: await runPine(req, bars, extra, daily) };
   }
   return {
     ok: false,

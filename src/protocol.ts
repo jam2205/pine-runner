@@ -42,6 +42,13 @@ export interface RunRequest {
    * `requestedSymbols` so the parent can supply it and run again.
    */
   extraSeries?: ExtraSeriesRef[];
+  /**
+   * Modified by jam2205 (2026). Daily bars for the chart's OWN symbol, reaching
+   * further back than the chart's bars: a JSON array of compact rows, bar open
+   * times. Used for daily, weekly and monthly requests on an intraday run, so
+   * they have the history a chart has. Needs `symbolInfo.session`.
+   */
+  dailyHistoryFile?: string;
 }
 
 export interface ExtraSeriesRef {

@@ -87,6 +87,7 @@ export async function runPine(
   req: RunRequest,
   bars: OhlcvBar[],
   extraSeries: ExtraSeries[] = [],
+  dailyHistory?: OhlcvBar[],
 ): Promise<RunResult> {
   const { PineEngine, PineIndicator } = loadPineEngine();
   patchPineRuntimeClassCompat(PineEngine);
@@ -102,6 +103,7 @@ export async function runPine(
     barMs: req.barMs,
     symbolInfo: req.symbolInfo,
     extraSeries,
+    dailyHistory,
   });
   const engine = new PineEngine(provider, req.symbol, req.timeframe, bars.length);
   patchPineRuntimeCompat(engine, {
